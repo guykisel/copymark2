@@ -1,0 +1,14 @@
+#Landing page.
+
+= Copymark =
+Copymark is a hard drive (and any other storage solution that can be mounted as a drive) performance benchmark designed to simulate real-world drag and drop file transfers. To accomplish this, it generates files and uses the operating system's shell (Explorer in Windows, Finder in OS X) to copy the files.
+
+= Copymark1 =
+*You can find Copymark1 releases here: http://sourceforge.net/projects/copytest/
+*Copymark1 is a GUI tool
+*Copymark1 supports Windows and OS X
+
+= Copymark2 =
+*Copymark2 is a from-scratch rewrite of Copymark1 that is designed to be easier to use, more reliable, and more flexible.
+*Copymark2 uses a command line interface
+*Copymark2 currently only supports Windows, but OS X support is planned
