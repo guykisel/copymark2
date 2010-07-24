@@ -1,6 +1,6 @@
 # Copymark2 v0.0.3: A simulation of real world file transfer performance
 # Copyright (C) 2010  Guy Kisel
-# Project hosted at http://sourceforge.net/projects/copytest/
+# Project hosted at http://code.google.com/p/copymark2/
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
