@@ -1,26 +1,38 @@
 #summary How to run Copymark2.
 
 = Command line syntax =
-Run Copymark2 using this syntax:
-{{{
-python copymark2.py [options] <source dir> <target dir> <workload file>
-}}}
+Run Copymark2 using this syntax: `python copymark2.py [options] <source dir> <target dir> <workload file>`
 
 = Command line options =
 === Calibration mode ===
- * -c or --calibrate
+ * `-c` or `--calibrate`
  * *Boolean*
  * Automatically calibrate file counts. Defaults to True.
  * [Calibration More information about Calibration mode].
 
 === Calibration heuristic ===
- * -H or -heuristic
+ * `-H` or `-heuristic`
  * *String*
  * Specify an external calibration heuristic.
  * [Calibration More information about Calibration heuristics].
 
 === Log file ===
- * -l or --logfile
+ * `-l` or `--logfile`
  * *String*
  * Specify a log file. Defaults to log.csv.
  * [Results More information about Copymark2 log files].
+
+=== Trials ===
+ * `-t` or `--trials`
+ * *Integer*
+ * Number of trials to run. Defaults to 1.
+
+=== Sweep mode ===
+ * `-s` or `--sweep`
+ * *Boolean*
+ * Run full sweeps instead of running each file size _trials_ times. Defaults to False.
+
+=== Drive fill mode ===
+ * `-f` or `--fill`
+ * *Boolean*
+ * Drive fill mode - gradually fill a drive while benchmarking. Defaults to False.
