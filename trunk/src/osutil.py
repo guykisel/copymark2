@@ -672,11 +672,14 @@ def get_percent_processor_time(cpu):
     return int(info.PercentProcessorTime)
 
 def get_process_percent_processor_time(procName):
+    list = []
+    
     for i in c.Win32_PerfFormattedData_PerfProc_Process():
         if(i.Name == procName):
-            return int(i.PercentProcessorTime)
+            
+            list += [int(i.PercentProcessorTime), i.IDProcess]
     
-    return -1
+    return list
 
 def wmi_format(driveLetter, fileSystem='NTFS', quickFormat=True,
         clusterSize=4096, label=''):
