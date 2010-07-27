@@ -1,13 +1,26 @@
 #summary How to run Copymark2.
 
-= Introduction =
+= Command line syntax =
+Run Copymark2 using this syntax:
+{{{
+python copymark2.py [options] <source dir> <target dir> <workload file>
+}}}
 
-Add your content here.
+= Command line options =
+=== Calibration mode ===
+ * -c or --calibrate
+ * *Boolean*
+ * Automatically calibrate file counts. Defaults to True.
+ * [Calibration More information about Calibration mode].
 
+=== Calibration heuristic ===
+ * -H or -heuristic
+ * *String*
+ * Specify an external calibration heuristic.
+ * [Calibration More information about Calibration heuristics].
 
-= Details =
-
-Add your content here.  Format your content with:
-  * Text in *bold* or _italic_
-  * Headings, paragraphs, and lists
-  * Automatic links to other wiki pages
+=== Log file ===
+ * -l or --logfile
+ * *String*
+ * Specify a log file. Defaults to log.csv.
+ * [Results More information about Copymark2 log files].
