@@ -1,4 +1,4 @@
-#summary Main pageof Copymark2 wiki
+#summary Main page of Copymark2 wiki
 = Copymark =
 Copymark is a hard drive (and any other storage solution that can be mounted as a drive) performance benchmark designed to simulate real-world drag and drop file transfers. To accomplish this, it generates files and uses the operating system's shell (Explorer in Windows, Finder in OS X) to copy the files.
 
