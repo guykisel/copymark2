@@ -1,13 +1,9 @@
-#summary One-sentence summary of this page.
+#summary How to set up Copymark2.
 
-= Introduction =
+= Prerequisites =
+ * [http://www.python.org/download/ Python 2.6 or 2.7]
+ * *Windows users:* [https://sourceforge.net/projects/pywin32/ Python for Windows extensions]
 
-Add your content here.
-
-
-= Details =
-
-Add your content here.  Format your content with:
-  * Text in *bold* or _italic_
-  * Headings, paragraphs, and lists
-  * Automatic links to other wiki pages
+= Download Copymark2 = 
+ * Get the [http://code.google.com/p/copymark2/downloads/list latest release].
+ * Extract the Copymark2 directory to your system.
