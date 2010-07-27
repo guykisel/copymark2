@@ -1,3 +1,4 @@
+#summary Main pageof Copymark2 wiki
 = Copymark =
 Copymark is a hard drive (and any other storage solution that can be mounted as a drive) performance benchmark designed to simulate real-world drag and drop file transfers. To accomplish this, it generates files and uses the operating system's shell (Explorer in Windows, Finder in OS X) to copy the files.
 
@@ -15,3 +16,5 @@ Copymark is a hard drive (and any other storage solution that can be mounted as 
  * [Setup]
  * [Run Running Copymark2]
  * [Results Interpreting results]
+
+<wiki:gadget url="http://www.ohloh.net/p/Copymark2/widgets/project_basic_stats.xml" height="220" border="1" />
