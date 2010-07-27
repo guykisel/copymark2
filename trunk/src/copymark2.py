@@ -27,10 +27,15 @@ import time
 #store tuple pairs of file sizes and counts
 calibrated_counts = {}
 
+#the directory copymark will create and use for testing in the source and target paths
 TEST_FILE_PATH = osutil.make_path('\\copymark_temp_files\\')
+
+#write and read representations used in logs
 WRITE = 'S->T'
 READ = 'T->S'
 TEST_NAME = 'Copymark2 0.0.4'
+
+#get rid of commas because logs are CSV formatted
 CPU = platform.processor().replace(',', '')
 
 #build system info string for logging purposes
@@ -44,7 +49,8 @@ if os.name == 'nt':
     import _winreg
     key = _winreg.OpenKey(_winreg.HKEY_LOCAL_MACHINE,
     'SOFTWARE\\Microsoft\Windows NT\\CurrentVersion')
-    OS_VERSION = str(str(_winreg.QueryValueEx(key, 'ProductName')[0]) + ' ' + str(platform.win32_ver()[2]) + ' ' + str(platform.version())).replace(',', '')
+    OS_VERSION = str(str(_winreg.QueryValueEx(key, 'ProductName')[0]) + \
+    ' ' + str(platform.win32_ver()[2]) + ' ' + str(platform.version())).replace(',', '')
 else:
     startTime = time.time()
     sysinfo += '\n'
@@ -57,6 +63,124 @@ else:
                 sysinfo += item
                 sysinfo_raw.extend(item)
                 OS_VERSION += item
+                
+def has_admin():
+    """Return true if the script is running with admin rights."""
+    import ctypes
+    try:
+        is_admin = (os.getuid() == 0)
+    except AttributeError:
+        is_admin = (ctypes.windll.shell32.IsUserAnAdmin() != 0)
+    return is_admin
+    
+def main(source, target, workload_file, calibrate, calibration_script, logfile, trials, sweep, fill):
+    """Set up the workload, run the test, then write a log file."""
+    test_start_time = osutil.get_time()
+    workload = parse_workload(workload_file, trials, sweep, fill, source, target)
+    results = run_workload(workload, calibration_script, source, target, calibrate, sweep, test_start_time, fill)
+    log_results(results, logfile)
+    
+def parse_workload(workload_file, trials, sweep, fill, source, target):
+    """Convert workload file (user-specified text file) to a list of WorkItems."""
+    workload = []
+    dummy_list = []
+    if fill:
+        #free space on the disk / the total size of the workload
+        fill_cycles = int(osutil.get_disk_space(target) / workload_size(workload_file, trials))
+    else:
+        fill_cycles = 1
+    for fill_index in xrange(fill_cycles):
+        for line in open(workload_file, 'r'):
+            #each line in the file must be in the format <count> <size> <units>
+            line_list = line.split()
+            if len(line_list) != 3:
+                #TODO: raise exception
+                pass
+            count = int(line_list[0])
+            size = osutil.convertToBytes(float(line_list[1]), line_list[2])
+
+            if not sweep:
+                #writes
+                for i in xrange(0, trials):
+                    workload.append(WorkItem(size, count, WRITE, i, fill_index))
+                #reads
+                for i in xrange(0, trials):
+                    workload.append(WorkItem(size, count, READ, i, fill_index))
+            else:
+                dummy_list.append((size, count, None, None))
+
+        if sweep:
+            for i in xrange(0, trials):
+                list = []
+                for tuple in dummy_list:
+                    list.append(WorkItem(tuple[0], tuple[1], WRITE, i, fill_index))
+                    list.append(WorkItem(tuple[0], tuple[1], READ, i, fill_index))
+                workload.extend(list)
+
+    return workload
+
+class WorkItem():
+    def __init__(self, file_size, file_count, direction, trial, fill_index):
+        self.file_size = file_size
+        self.file_count = file_count
+        self.direction = direction
+        self.trial = trial
+        self.fill_index = fill_index
+        
+def workload_size(workload_file, trials):
+    """Parse the workload file to calculate the total workload size."""
+    total_size = 0
+    for line in open(workload_file, 'r'):
+        line_list = line.split()
+        if len(line_list) != 3:
+            #TODO: raise exception
+            pass
+        count = int(line_list[0])
+        size = osutil.convertToBytes(float(line_list[1]), line_list[2])
+        total_size += count * size
+    return total_size
+    
+def run_workload(workload, calibration_script, source, target, _calibrate, sweep, test_start_time, fill):
+    """Run through a workload provided as a list of WorkItems."""
+    results = []
+    for i, workitem in enumerate(workload):
+        file_size = workitem.file_size
+        file_count = workitem.file_count
+        direction = workitem.direction
+        trial = workitem.trial
+        fill_index = workitem.fill_index
+
+        if _calibrate:
+            if calibration_script == None:
+                calibration_method = '20 second minimum'
+            else:
+                calibration_method = calibration_script
+            file_count, files_generated = calibrate(file_size, source, target, file_count, calibration_script)
+        else:
+            calibration_method = 'not calibrated'
+
+        #reads always happen after writes, so reuse if read
+        #if not the first trial and not sweeping, the previous trial had the same workload, so reuse
+        #if calibrate mode is on and files were just generated, reuse
+        if direction == READ or (trial > 0 and not sweep) or (_calibrate and files_generated):
+            reuse = True
+        else:
+            reuse = False
+
+        print ''
+        print '*' * 79
+        print 'Test run ' + str(i+1) + ' of ' + str(len(workload)) + ': Direction = ' + direction + ', Trial = ' + str(trial)
+        size, units = osutil.scale_bytes(file_size)
+        print 'File size: ' + str(size) + ' ' + str(units) + ' x ' + str(file_count) + ' files'
+        print '*' * 79
+        duration, start, end = test(file_size, file_count, source, target, fill_index, fill, direction, reuse, verbose=True)
+        time_elapsed = str(datetime.timedelta(seconds=int(osutil.get_time() - test_start_time))).replace(',',' ')
+        print 'Time elapsed: ' + time_elapsed
+        results.append(Result(source, target, file_size, file_count, direction, trial, fill_index, reuse, duration, start, end, time_elapsed, calibration_method))
+
+    osutil.delete_dir(source + TEST_FILE_PATH)
+    osutil.delete_dir(target + TEST_FILE_PATH)
+    return results
 
 def calibrate(file_size, source, target, start_count=None, calibration_script=None):
     """Calibrate a file count for a given file size."""
@@ -103,7 +227,9 @@ def external_calibration(file_size, start_count, source, target, script):
     return int(p.stdout.readline())
 
 def default_calibration(file_size, start_count, source, target):
-    """Run the default calibration algorithm. Until writes and reads both take over 20 seconds, keep doubling the file count."""
+    """Run the default calibration algorithm. Until writes and reads both 
+    take over 20 seconds, keep doubling the file count.
+    """
     calibrated_count = start_count
     while True:
         print 'Write calibration trial. Size: ' + str(file_size) + ' Count: ' + str(calibrated_count)
@@ -122,7 +248,6 @@ def default_calibration(file_size, start_count, source, target):
 
 def test(file_size, file_count, source, target, fill_index=-1, fill=False, direction=None, reuse=False, verbose=False):
     """Run an individual size/count pair."""
-
     if fill:
         fill_string = '\\' + str(fill_index) + '\\' + str(file_size) + '_' + str(file_count) + '\\'
     else:
@@ -172,58 +297,15 @@ def test(file_size, file_count, source, target, fill_index=-1, fill=False, direc
         total_size = file_size * file_count
         (printSize, units) = osutil.scale_bytes(total_size)
         scaled_speed, scaled_units = osutil.scale_bytes(total_size / duration)
-        print 'Transfer complete: ' + str(round(scaled_speed, 1)) + ' ' + scaled_units + '/s over ' + str(round(duration, 1)) + ' seconds.'
+        print 'Transfer complete: ' + str(round(scaled_speed, 1)) + ' ' + \
+        scaled_units + '/s over ' + str(round(duration, 1)) + ' seconds.'
         print 'Data transferred: ' + str(printSize) + ' ' + units
 
     return (duration, start, end)
 
-def run_workload(workload, calibration_script, source, target, _calibrate, sweep, test_start_time, fill):
-    """Run through a workload specified as a list of tuples. Tuples
-    follow the format (file_size, file_count, calibrate, direction, trial) where calibrate
-    is a Boolean."""
-    results = []
-    for i, workitem in enumerate(workload):
-        file_size = workitem.file_size
-        file_count = workitem.file_count
-        direction = workitem.direction
-        trial = workitem.trial
-        fill_index = workitem.fill_index
-
-        if _calibrate:
-            if calibration_script == None:
-                calibration_method = '20 second minimum'
-            else:
-                calibration_method = calibration_script
-            file_count, files_generated = calibrate(file_size, source, target, file_count, calibration_script)
-        else:
-            calibration_method = 'not calibrated'
-
-        #reads always happen after writes, so reuse if read
-        #if not the first trial and not sweeping, the previous trial had the same workload, so reuse
-        #if calibrate mode is on and files were just generated, reuse
-        if direction == READ or (trial > 0 and not sweep) or (_calibrate and files_generated):
-            reuse = True
-        else:
-            reuse = False
-
-        print ''
-        print '*' * 79
-        print 'Test run ' + str(i+1) + ' of ' + str(len(workload)) + ': Direction = ' + direction + ', Trial = ' + str(trial)
-        size, units = osutil.scale_bytes(file_size)
-        print 'File size: ' + str(size) + ' ' + str(units) + ' x ' + str(file_count) + ' files'
-        print '*' * 79
-        duration, start, end = test(file_size, file_count, source, target, fill_index, fill, direction, reuse, verbose=True)
-        time_elapsed = str(datetime.timedelta(seconds=int(osutil.get_time() - test_start_time))).replace(',',' ')
-        print 'Time elapsed: ' + time_elapsed
-        results.append(Result(source, target, file_size, file_count, direction, trial, fill_index, reuse, duration, start, end, time_elapsed, calibration_method))
-
-    osutil.delete_dir(source + TEST_FILE_PATH)
-    osutil.delete_dir(target + TEST_FILE_PATH)
-    return results
-
-
 class Result():
-    def __init__(self, source, target, file_size, file_count, direction, trial, fill_index, reuse, duration, start, end, time_elapsed, calibration_method, notes=''):
+    def __init__(self, source, target, file_size, file_count, direction, 
+    trial, fill_index, reuse, duration, start, end, time_elapsed, calibration_method, notes=''):
         self.source = source
         self.target = target
         self.file_size = file_size
@@ -245,13 +327,13 @@ def log_results(results, logfile):
     date = str(date_struct.tm_mon) + '/' + str(date_struct.tm_mday) + '/' + str(date_struct.tm_year)
 
     with open(logfile, 'w') as log:
-
         result_dict = {}
 
         #column names
-        log.write('reading from, writing to, I/O direction, MiB/s, MB/s, total bytes, file size, file count, duration, start time, end time, trial, fill index, test, OS, CPU, start date, test duration, calibration method, notes\n')
+        log.write('reading from, writing to, I/O direction, MiB/s, MB/s, ' + \
+        'total bytes, file size, file count, duration, start time, end ' + \
+        'time, trial, fill index, test, OS, CPU, start date, test duration, calibration method, notes\n')
         for result in results:
-
             result_tuple = (result.direction, result.file_size, result.file_count)
             if result_tuple not in result_dict:
                 result_dict[result_tuple] = []
@@ -322,82 +404,6 @@ def relative_standard_deviation(data):
     relative = (standard_deviation * 100) / mean
     return relative
 
-def workload_size(workload_file, trials):
-    total_size = 0
-    for line in open(workload_file, 'r'):
-        line_list = line.split()
-        if len(line_list) != 3:
-            #TODO: raise exception
-            pass
-        count = int(line_list[0])
-        size = osutil.convertToBytes(float(line_list[1]), line_list[2])
-        total_size += count * size
-    total_size *= trials
-    return total_size
-
-def parse_workload(workload_file, trials, sweep, fill, source, target):
-    """Convert workload file to a list of tuples in the format
-    (file_size, file_count, direction, trial)
-    that run_workload() can read."""
-    workload = []
-    dummy_list = []
-    if fill:
-        fill_cycles = int(osutil.get_disk_space(target) / workload_size(workload_file, trials))
-    else:
-        fill_cycles = 1
-    for fill_index in xrange(fill_cycles):
-        for line in open(workload_file, 'r'):
-            line_list = line.split()
-            if len(line_list) != 3:
-                #TODO: raise exception
-                pass
-            count = int(line_list[0])
-            size = osutil.convertToBytes(float(line_list[1]), line_list[2])
-
-            if not sweep:
-                #writes
-                for i in xrange(0, trials):
-                    workload.append(WorkItem(size, count, WRITE, i, fill_index))
-                #reads
-                for i in xrange(0, trials):
-                    workload.append(WorkItem(size, count, READ, i, fill_index))
-            else:
-                dummy_list.append((size, count, None, None))
-
-        if sweep:
-            for i in xrange(0, trials):
-                list = []
-                for tuple in dummy_list:
-                    list.append(WorkItem(tuple[0], tuple[1], WRITE, i, fill_index))
-                    list.append(WorkItem(tuple[0], tuple[1], WRITE, i, fill_index))
-                workload.extend(list)
-
-    return workload
-
-class WorkItem():
-    def __init__(self, file_size, file_count, direction, trial, fill_index):
-        self.file_size = file_size
-        self.file_count = file_count
-        self.direction = direction
-        self.trial = trial
-        self.fill_index = fill_index
-
-def main(source, target, workload_file, calibrate, calibration_script, logfile, trials, sweep, fill):
-    test_start_time = osutil.get_time()
-    workload = parse_workload(workload_file, trials, sweep, fill, source, target)
-    results = run_workload(workload, calibration_script, source, target, calibrate, sweep, test_start_time, fill)
-    log_results(results, logfile)
-
-def has_admin():
-    """Return true if the script is running with admin rights."""
-
-    import ctypes
-    try:
-     is_admin = os.getuid() == 0
-    except AttributeError:
-     is_admin = ctypes.windll.shell32.IsUserAnAdmin() != 0
-    return is_admin
-
 if __name__ == "__main__":
     import optparse
     usage = 'usage: %prog [options] <source dir> <target dir> <workload file>'
@@ -410,17 +416,9 @@ if __name__ == "__main__":
     parser.add_option('-f', '--fill', action='store_true', dest='fill', default=False, help='Drive fill mode - gradually fill a drive while benchmarking. Defaults to False.')
     (options, args) = parser.parse_args()
     if has_admin():
-        try:
-            if len(args) < 3:
-                print 'Run "copymark2.py -h" for help.'
-            else:
-                main(args[0], args[1], args[2], options.calibrate, options.calibration_script, options.logfile, options.trials, options.sweep, options.fill)
-        except WindowsError, e:
-            if 'Error 740' in str(e):
-                print 'Copymark must be run with admin rights. Exiting.'
+        if len(args) < 3:
+            print 'Run "copymark2.py -h" for help.'
+        else:
+            main(args[0], args[1], args[2], options.calibrate, options.calibration_script, options.logfile, options.trials, options.sweep, options.fill)
     else:
         print 'Copymark must be run with admin rights. Exiting.'
-        #os.system('runas /user:Administrator "python copymark2.py"') #TODO need to pass args
-
-#    print 'Press Enter to exit...'
-#    raw_input()
