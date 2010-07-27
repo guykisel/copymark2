@@ -14,3 +14,4 @@ Copymark is a hard drive (and any other storage solution that can be mounted as 
 = Using Copymark2 =
  * [Setup]
  * [Run Running Copymark2]
+ * [Results Interpreting results]
