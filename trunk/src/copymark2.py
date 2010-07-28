@@ -142,6 +142,8 @@ def workload_size(workload_file, trials):
     
 def run_workload(workload, calibration_script, source, target, _calibrate, sweep, test_start_time, fill):
     """Run through a workload provided as a list of WorkItems."""
+    osutil.delete_dir(source + TEST_FILE_PATH)
+    osutil.delete_dir(target + TEST_FILE_PATH)
     results = []
     for i, workitem in enumerate(workload):
         file_size = workitem.file_size
@@ -162,7 +164,7 @@ def run_workload(workload, calibration_script, source, target, _calibrate, sweep
         #reads always happen after writes, so reuse if read
         #if not the first trial and not sweeping, the previous trial had the same workload, so reuse
         #if calibrate mode is on and files were just generated, reuse
-        if direction == READ or (trial > 0 and not sweep) or (_calibrate and files_generated):
+        if direction == READ or (trial > 0 and not sweep) or (_calibrate and files_generated and not fill):
             reuse = True
         else:
             reuse = False
@@ -261,9 +263,11 @@ def test(file_size, file_count, source, target, fill_index=-1, fill=False, direc
         file_path = target + TEST_FILE_PATH + fill_string
         deletion_path = source + TEST_FILE_PATH
     if reuse:
+        print 'Reusing files.'
         osutil.delete_dir(deletion_path)
         osutil.make_dir(deletion_path)
     else:
+        print 'Generating new files.'
         #delete from both target and source
         osutil.delete_dir(file_path)
         osutil.make_dir(file_path)
@@ -288,7 +292,7 @@ def test(file_size, file_count, source, target, fill_index=-1, fill=False, direc
 
     duration = end - start
 
-    if not os.path.isdir(osutil.make_path(target + TEST_FILE_PATH + fill_string)) or not success:
+    if not (os.path.isdir(osutil.make_path(target + TEST_FILE_PATH)) or os.path.isdir(osutil.make_path(target + TEST_FILE_PATH + fill_string))) or not success:
         #raise exception because transfer failed
         print 'ERROR: Destination folder not found. Transfer failed.'
         raise Exception()
@@ -408,12 +412,12 @@ if __name__ == "__main__":
     import optparse
     usage = 'usage: %prog [options] <source dir> <target dir> <workload file>'
     parser = optparse.OptionParser(usage)
-    parser.add_option('-c', '--calibrate', action='store_true', dest='calibrate', default=True, help='Automatically calibrate file counts. Defaults to True.')
+    parser.add_option('-c', '--calibrate', action='store_false', dest='calibrate', default=True, help='Set this flag to disable file count calibration.')
     parser.add_option('-H', '--heuristic', action='store', type='string', dest='calibration_script', help='Specify an external calibration heuristic.')
     parser.add_option('-l', '--logfile', action='store', type='string', dest='logfile', default='log.csv', help='Specify a log file. Defaults to log.csv.')
     parser.add_option('-t', '--trials', action='store', type='int', dest='trials', default=1, help='Number of trials to run. Defaults to 1.')
-    parser.add_option('-s', '--sweep', action='store_true', dest='sweep', default=False, help='Run full sweeps instead of running each file size <trials> times. Defaults to False.')
-    parser.add_option('-f', '--fill', action='store_true', dest='fill', default=False, help='Drive fill mode - gradually fill a drive while benchmarking. Defaults to False.')
+    parser.add_option('-s', '--sweep', action='store_true', dest='sweep', default=False, help='Run full sweeps instead of running each file size <trials> times.')
+    parser.add_option('-f', '--fill', action='store_true', dest='fill', default=False, help='Drive fill mode - gradually fill a drive while benchmarking.')
     (options, args) = parser.parse_args()
     if has_admin():
         if len(args) < 3:
