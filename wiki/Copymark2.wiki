@@ -9,7 +9,7 @@ Copymark is a hard drive (and any other storage solution that can be mounted as 
 
 = Copymark2 =
   * Copymark2 is a from-scratch rewrite of Copymark1 that is designed to be easier to use, more reliable, and more flexible.
-  * Copymark2 uses a command line interface.
+  * Copymark2 uses a command line interface. (A GUI is planned)
   * Copymark2 currently only supports Windows, but OS X support is planned.
 
 = Using Copymark2 =
