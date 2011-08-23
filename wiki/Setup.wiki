@@ -2,7 +2,9 @@
 
 = Prerequisites =
  * [http://www.python.org/download/ Python 2.6 or 2.7]
- * *Windows users:* [https://sourceforge.net/projects/pywin32/ Python for Windows extensions]
+==Windows users:==
+ # [https://sourceforge.net/projects/pywin32/ Python for Windows extensions]
+ # [http://timgolden.me.uk/python/wmi/index.html Python WMI module]
 
 = Download Copymark2 = 
  * Get the [http://code.google.com/p/copymark2/downloads/list latest release].
