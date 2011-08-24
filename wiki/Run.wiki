@@ -1,7 +1,7 @@
 #summary How to run Copymark2.
 
 = Command line syntax =
-Run Copymark2 using this syntax: `python copymark2.py [options] <source dir> <target dir> <workload file>`
+Run Copymark2 using this syntax: `python copymark2.py <source dir> <target dir> <workload file> [options]` 
 
 = Command line options =
 === Calibration mode ===
