@@ -30,7 +30,7 @@ import sys
 calibrated_counts = {}
 
 #the path on each drive where test files are created
-TEST_FILE_PATH = osutil.make_path('/copymark_temp_files/')
+TEST_FILE_PATH = osutil.make_path('copymark_temp_files/')
 
 #source to target
 WRITE = 'S->T'
@@ -59,7 +59,7 @@ if os.name == 'nt':
     except WindowsError, e:
         print e
         OS_VERSION = 'unknown'
-else:
+elif osutil.OS == 'mac':
     #if not windows, assume it's running on a mac
     startTime = time.time()
     sysinfo += '\n'
@@ -72,6 +72,15 @@ else:
                 sysinfo += item
                 sysinfo_raw.extend(item)
                 OS_VERSION += item
+elif osutil.OS == 'posix':
+    try:
+        distname, version, id = platform.linux_distribution()
+        OS_VERSION = str(distname) + ' ' + str(version) + ' ' + str(id)
+    except AttributeError:
+        distname, version, id = platform.dist()
+        OS_VERSION = str(distname) + ' ' + str(version) + ' ' + str(id)
+
+print 'OS: ' + str(OS_VERSION)
 
 def calibrate(file_size, source, target, start_count=None, calibration_script=None):
     """Calibrate a file count for a given file size."""
@@ -177,8 +186,11 @@ def test(file_size, file_count, source, target, fill_index=-1, fill=False, direc
     osutil.clear_file_cache()
     time.sleep(1)
 
+    source_path = os.path.join(source, TEST_FILE_PATH)
+    target_path = os.path.join(target, TEST_FILE_PATH, fill_string)
+
     #wait for disks to settle
-    osutil.wait_for_disk_idle([osutil.get_drive_letter(target)[0].upper(), osutil.get_drive_letter(source)[0].upper()])
+    osutil.wait_for_dir_idle([target, source])
 
     if verbose:
         print 'Copying... '
@@ -186,9 +198,9 @@ def test(file_size, file_count, source, target, fill_index=-1, fill=False, direc
     #test window
     start = osutil.get_time()
     if direction == WRITE:
-        success = osutil.copy_dir(os.path.join(source, TEST_FILE_PATH), os.path.join(target, TEST_FILE_PATH, fill_string), shell_copy=shell_copy, quiet=False)
+        success = osutil.copy_dir(source_path, target_path, shell_copy=shell_copy, quiet=False)
     else:
-        success = osutil.copy_dir(os.path.join(target, TEST_FILE_PATH, fill_string), os.path.join(source, TEST_FILE_PATH), shell_copy=shell_copy, quiet=False)
+        success = osutil.copy_dir(target_path, source_path, shell_copy=shell_copy, quiet=False)
     end = osutil.get_time()
     #end of test window
 
@@ -208,9 +220,9 @@ def test(file_size, file_count, source, target, fill_index=-1, fill=False, direc
             raise Exception('File transfer failed.')
         time.sleep(5)
 
-    print 'SHFileOperation returned. Waiting for disk activity to stop...'
+    print 'File transfer call returned. Waiting for disk activity to stop...'
     #wait for disks to settle
-    last_activity = osutil.wait_for_disk_idle([osutil.get_drive_letter(target)[0].upper(), osutil.get_drive_letter(source)[0].upper()])
+    last_activity = osutil.wait_for_dir_idle([target, source])
     true_duration = last_activity - start
 
     #print out some quick stats
@@ -258,7 +270,8 @@ def run_workload(workload, calibration_script, source, target, _calibrate, sweep
         print '*' * 79
         print 'Test run ' + str(i+1) + ' of ' + str(len(workload)) + ': Direction = ' + direction + ', Trial = ' + str(trial) + ', Reuse = ' + str(reuse)
         size, units = osutil.scale_bytes(file_size)
-        print 'File size: ' + str(size) + ' ' + str(units) + ' x ' + str(file_count) + ' files'
+        total_size, total_units = osutil.scale_bytes(file_size * file_count)
+        print 'File size: ' + str(size) + ' ' + str(units) + ' x ' + str(file_count) + ' files (' + str(total_size) + ' ' + str(total_units) + ' total)'
         print '*' * 79
         duration, start, end, true_duration = test(file_size, file_count, source, target, fill_index, fill, direction, reuse, verbose=True)
         time_elapsed = str(datetime.timedelta(seconds=int(osutil.get_time() - test_start_time))).replace(',',' ')
@@ -362,7 +375,7 @@ def log_results(results, logfile, calibrated_workload_filename):
                 calibrated_workload.write(workload_row)
         print median_row
 
-    print 'Test completed at {0}'.format(time.asctime())
+    print 'Test completed at ' + time.asctime()
 
 def relative_standard_deviation(data):
     import math
@@ -388,7 +401,7 @@ def workload_size(workload_file, trials):
     for line in open(workload_file, 'r'):
         line_list = line.split()
         if len(line_list) != 3:
-            print 'Invalid workload entry: {0}'.format(line)
+            print 'Invalid workload entry: ' + str(line)
             sys.exit()
         count = int(line_list[0])
         size = osutil.convertToBytes(float(line_list[1]), line_list[2])
@@ -410,7 +423,7 @@ def parse_workload(workload_file, trials, sweep, fill, source, target):
         for line in open(workload_file, 'r'):
             line_list = line.split()
             if len(line_list) != 3:
-                print 'Invalid workload entry: {0}'.format(line)
+                print 'Invalid workload entry: ' + str(line)
                 sys.exit()
             count = int(line_list[0])
             size = osutil.convertToBytes(float(line_list[1]), line_list[2])
@@ -444,6 +457,10 @@ class WorkItem(object):
         self.fill_index = fill_index
 
 def main(source, target, workload_file, calibrate, calibration_script, logfile, trials, sweep, fill):
+    if not source.endswith('\\') or source.endswith('/'):
+        source = os.path.normpath(source + '/').replace('\\ ', ' ')
+    if not target.endswith('\\') or target.endswith('/'):
+        target = os.path.normpath(target + '/').replace('\\ ', ' ')
     if sweep:
         print 'Sweep mode is on.'
     osutil.restart_explorer()

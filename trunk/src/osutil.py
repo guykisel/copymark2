@@ -50,14 +50,13 @@ except ImportError:
 FILES_COPIED = 0
 
 def restart_explorer():
-    subprocess.check_call(
-        'taskkill /f /fi "STATUS eq RUNNING" /im explorer.exe'
-    )
-    subprocess.check_call(
-        'cmd /c start "explorer.exe" "{0}"'.format(
-            os.path.join(os.environ.get('SYSTEMROOT'), 'explorer.exe')
+    if os.name == 'nt':
+        subprocess.check_call(
+            'taskkill /f /fi "STATUS eq RUNNING" /im explorer.exe'
         )
-    )
+        subprocess.check_call(
+            'cmd /c start "explorer.exe" "' + str(os.path.join(os.environ.get('SYSTEMROOT'), 'explorer.exe')) + '"'
+        )
 
 class filesystemLock(object):
     """Decorator to prevent more than one thread from trying to access
@@ -89,8 +88,15 @@ def windows_version():
         return None
         
 def clear_file_cache():
-    if os.name == 'posix':
-        os.system('echo 1 > /proc/sys/vm/drop_caches')
+    if OS == 'posix':
+        subprocess.call('sync', shell=True)
+        subprocess.call('echo 1 > /proc/sys/vm/drop_caches', shell=True)
+    elif OS == 'mac':
+        subprocess.call('sync', shell=True)
+        subprocess.call('purge', shell=True)
+        subprocess.call('sync', shell=True)
+        subprocess.call('du -sx', shell=True)
+        subprocess.call('sync', shell=True)
 
 def remount(dir, verbose=False, confirm_unmount=False):
     """Unmount and remount the drive corresponding to the given directory.
@@ -132,10 +138,10 @@ def remount(dir, verbose=False, confirm_unmount=False):
                 break
             if not confirm_unmount:
                 break
-        print '{0} attempts required to unmount drive.'.format(attempts)
+        print str(attempts) + ' attempts required to unmount drive.'
         if attempts > 1:
             file = open('remounts.txt', 'w+')
-            file.write('{0} - {1} remount attempts.'.format(time.asctime(), attempts))
+            file.write(str(time.asctime()) + ' - ' + str(attempts) + ' remount attempts.')
         output = diskpart(['select volume ' + str(volume), 'assign letter=' + drive_letter])
         if verbose:
             for line in output:
@@ -252,19 +258,19 @@ def filegen(path, size, verbose=False):
     #use the random data file creator tool
         if verbose:
             print 'Generating file: ' + str(size) + ' bytes'
-        os.system('rdfc "' + path + '" ' + str(size) + ' > nul')
+        subprocess.call('rdfc "' + path + '" ' + str(size) + ' > nul', shell=True)
     elif os.name == 'posix':
         if size >= 1048576:
         #generate 1 MiB of random bytes
-            os.system('dd if=/dev/urandom of=temp.txt bs=1 count=1048576')
+            subprocess.call('dd if=/dev/urandom of=temp.txt bs=1 count=1048576', shell=True)
         while size >= 1048576:
         #repeatedly concatenate the above generated data to generate a
         #larger file
-            os.system('cat temp.txt >> "' + path + '"')
+            subprocess.call('cat temp.txt >> "' + path + '"', shell=True)
             size -= 1048576
         if size > 0:
-            os.system('dd if=/dev/urandom of=temp.txt bs=1 count=' + str(size))
-            os.system('cat temp.txt >> "' + path + '"')
+            subprocess.call('dd if=/dev/urandom of=temp.txt bs=1 count=' + str(size), shell=True)
+            subprocess.call('cat temp.txt >> "' + path + '"', shell=True)
         delete_file('temp.txt')
 
 def generate_files(file_path, file_size, file_count):
@@ -281,7 +287,7 @@ def generate_files(file_path, file_size, file_count):
         except IOError, e:
             print 'Generate failed!'
             print str(e)
-    print 'Time to generate files: {0} seconds'.format(int(time.clock() - start))
+    print 'Time to generate files: ' + str(int(time.clock() - start))+ ' seconds'
     return generated_files
 
 def make_path(*args):
@@ -400,7 +406,7 @@ def copy(sourcePath, targetPath, is_dir=True, verbose=False, quiet=True, shell_c
                     start = time.clock()
                     while FILES_COPIED < len(files_to_copy):
                         time.sleep(.1)
-                    print 'Waited for {0} seconds after all file transfers were queued.'.format(int(time.clock() - start))
+                    print 'Waited for ' + str(int(time.clock() - start)) + ' seconds after all file transfers were queued.'
             except pywintypes.error, e:
                 print 'File transfer failed.'
                 return False
@@ -413,7 +419,8 @@ def copy(sourcePath, targetPath, is_dir=True, verbose=False, quiet=True, shell_c
                       '" "' + make_path(targetPath) + '"')
         return True
     elif OS == 'posix':
-        os.system('cp -Rf "' + sourcePath + '" "' + targetPath + '"')
+        copy_string = 'cp -Rf "' + sourcePath + '" "' + targetPath + '"'
+        os.system(copy_string)
         return True
     return False
 
@@ -997,35 +1004,111 @@ def close_clipboard():
     except Exception, e:
         print e
 
+def get_mount_point(path):
+    path = os.path.abspath(path)
+    while not os.path.ismount(path):
+        path = os.path.dirname(path)
+    p = subprocess.Popen('mount',
+                         stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                         shell=True)
+    device = None
+    for line in p.stdout.readlines():
+        if path in line:
+            device = line
+
+    import re
+    txt=device
+    re1='.*?'	# Non-greedy match on filler
+    re2='(?:[a-z][a-z]+)'	# Uninteresting: word
+    re3='.*?'	# Non-greedy match on filler
+    re4='((?:[a-z][a-z]+))'	# Word 1
+    rg = re.compile(re1+re2+re3+re4,re.IGNORECASE|re.DOTALL)
+    m = rg.search(txt)
+    if m:
+        device=m.group(1)
+    return device
+
 def disk_activity(disk):
-    if os.name == 'nt':
+    if OS == 'nt':
         c = wmi.WMI()
         for i in c.Win32_PerfFormattedData_PerfDisk_LogicalDisk():
             if disk in i.Name:
                 return int(i.PercentDiskTime)
-    else:
-        return 0
+    elif OS == 'posix':
+        p = subprocess.Popen('cat /sys/block/' + disk + '/stat',
+                             stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                             shell=True)
+        import re
+        re1='.*?'	# Non-greedy match on filler
+        re2='\\d+'	# Uninteresting: int
+        re3='.*?'	# Non-greedy match on filler
+        re4='\\d+'	# Uninteresting: int
+        re5='.*?'	# Non-greedy match on filler
+        re6='\\d+'	# Uninteresting: int
+        re7='.*?'	# Non-greedy match on filler
+        re8='\\d+'	# Uninteresting: int
+        re9='.*?'	# Non-greedy match on filler
+        re10='\\d+'	# Uninteresting: int
+        re11='.*?'	# Non-greedy match on filler
+        re12='\\d+'	# Uninteresting: int
+        re13='.*?'	# Non-greedy match on filler
+        re14='\\d+'	# Uninteresting: int
+        re15='.*?'	# Non-greedy match on filler
+        re16='\\d+'	# Uninteresting: int
+        re17='.*?'	# Non-greedy match on filler
+        re18='(\\d+)'	# Integer Number 1
+        
+        rg = re.compile(re1+re2+re3+re4+re5+re6+re7+re8+re9+re10+re11+re12+re13+re14+re15+re16+re17+re18,re.IGNORECASE|re.DOTALL)
+        for line in p.stdout.readlines():
+            m = rg.search(line)
+            if m:
+                int1=m.group(1)
+                return int1
+
+    elif OS == 'mac':
+        p = subprocess.Popen('fs_usage',
+                             stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                             shell=True)
+        time.sleep(.1)
+        p.terminate()
+        for line in p.stdout.readlines():
+            if 'Python' in line or 'Finder' in line or 'dd' in line:
+                return 1
+        
+    return 0
+
+def wait_for_dir_idle(dirs, verbose=False, idle_time=10):
+    disks = []
+    if os.name == 'posix':
+        for dir in dirs:
+            device = get_mount_point(dir)
+            disks.append(device)
+    elif os.name == 'nt':
+        for dir in dirs:
+            disk = get_drive_letter(dir)[0].upper()
+            disks.append(disk.upper())
+    return wait_for_disk_idle(disks, verbose, idle_time)
 
 def wait_for_disk_idle(disks, verbose=False, idle_time=10):
     disks = list(set(disks))
     if verbose:
-        print 'Waiting for disks to be idle: {0}'.format(disks)
+        print 'Waiting for disks to be idle: ' + str(disks)
     seconds_idle = 0
-    last_activity = time.clock()
+    last_activity = get_time()
     while seconds_idle < idle_time:
         all_idle = True
         for disk in disks:
-            activity = disk_activity(disk.upper())
+            activity = int(disk_activity(disk))
             if activity != 0:
                 all_idle = False
                 break
         if all_idle:
             seconds_idle += 1
             if verbose:
-                print 'Disks have been idle for {0} seconds.'.format(seconds_idle)
+                print 'Disks have been idle for ' + str(seconds_idle) + ' seconds.'
         else:
             seconds_idle = 0
-            last_activity = time.clock()
+            last_activity = get_time()
             if verbose:
                 print 'Disk activity detected. Resetting counter.'
         time.sleep(1)
