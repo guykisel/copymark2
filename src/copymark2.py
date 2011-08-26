@@ -261,7 +261,7 @@ def run_workload(workload, calibration_script, source, target, _calibrate, sweep
         #writes always happen after reads, so reuse if write
         #if not the first trial and not sweeping, the previous trial had the same workload, so reuse
         #if calibrate mode is on and files were just generated, reuse
-        if direction == WRITE or (trial > 0 and not sweep) or (_calibrate and files_generated):
+        if not osutil.OS == 'mac' and (direction == WRITE or (trial > 0 and not sweep) or (_calibrate and files_generated)):
             reuse = True
         else:
             reuse = False
@@ -487,6 +487,13 @@ if __name__ == "__main__":
     import sys
     print 'Python version = ' + str(sys.version)
     import optparse
+    import osutil
+    if osutil.OS == 'windows':
+        try:
+            import wmi
+        except ImportError:
+            print 'Copymark requires the Python WMI module in Windows. http://timgolden.me.uk/python/wmi/index.html'
+            sys.exit()
     usage = 'usage: %prog [options] <source dir> <target dir> <workload file>'
     parser = optparse.OptionParser(usage)
     parser.add_option('-c', '--calibrate', action='store_true', dest='calibrate', default=False, help='Automatically calibrate file counts. Defaults to False.')

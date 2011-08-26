@@ -1029,7 +1029,7 @@ def get_mount_point(path):
     return device
 
 def disk_activity(disk):
-    if OS == 'nt':
+    if OS == 'windows':
         c = wmi.WMI()
         for i in c.Win32_PerfFormattedData_PerfDisk_LogicalDisk():
             if disk in i.Name:
