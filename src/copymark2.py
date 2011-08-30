@@ -1,5 +1,5 @@
 # !/usr/bin/env python
-# Copymark2 v0.0.8: A simulation of real world file transfer performance
+# Copymark2 v0.0.9: A simulation of real world file transfer performance
 # Copyright (C) 2011  Guy Kisel
 # Project hosted at http://code.google.com/p/copymark2/
 
@@ -38,7 +38,7 @@ WRITE = 'S->T'
 #target to source
 READ = 'S<-T'
 
-TEST_NAME = 'Copymark2 0.0.8'
+TEST_NAME = 'Copymark2 0.0.9'
 CPU = platform.processor().replace(',', '')
 
 #build system info string for logging purposes
