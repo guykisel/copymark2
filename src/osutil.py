@@ -93,7 +93,6 @@ def clear_file_cache():
         subprocess.call('echo 1 > /proc/sys/vm/drop_caches', shell=True)
     elif OS == 'mac':
         subprocess.call('sync', shell=True)
-        subprocess.call('purge', shell=True)
         subprocess.call('sync', shell=True)
         subprocess.call('du -sx', shell=True)
         subprocess.call('sync', shell=True)
@@ -148,7 +147,36 @@ def remount(dir, verbose=False, confirm_unmount=False):
                 if 'successfully assigned' in line:
                     return
             print 'Unable to remount.'
-    #TODO: add posix support
+    elif os.name == 'posix':
+        path = os.path.abspath(dir)
+        while not os.path.ismount(path):
+            path = os.path.dirname(path)
+        try:
+            device = get_mount_point(dir)
+            print 'Remounting ' + path + ' on ' + device
+            if OS == 'posix':
+                unmount_string = 'umount "' + path + '"'
+            elif OS == 'mac':
+                unmount_string = 'diskutil unmount "' + path + '"'
+            #print unmount_string
+            subprocess.call(unmount_string, shell=True)
+            time.sleep(3)
+            if not OS == 'mac':
+                mkdir_string = 'mkdir "' + path + '"'
+                #print mkdir_string
+                subprocess.call(mkdir_string, shell=True)
+                time.sleep(1)
+            if OS == 'posix':
+                mount_string = 'mount /dev/' + device + ' "' + path + '"'
+            elif OS == 'mac':
+                mount_string = 'diskutil mount /dev/' + device
+            #print mount_string
+            subprocess.call(mount_string, shell=True)
+            time.sleep(3)
+            print 'Remount complete.'
+        except OSError, e:
+            print e
+            print 'Remount of ' + dir + ' failed.'
 
 def get_drive_letter(dir):
     """Get the drive letter of a given directory. For example, given 
@@ -415,12 +443,13 @@ def copy(sourcePath, targetPath, is_dir=True, verbose=False, quiet=True, shell_c
         if not os.path.isdir(sourcePath):
             os.system('cp -Rf "' + sourcePath + '" "' + targetPath + '"')
         else:
-            os.system('osascript finder_copy.scpt "' + make_path(sourcePath) +\
-                      '" "' + make_path(targetPath) + '"')
+            finder_copy_string = 'osascript finder_copy.scpt "' + make_path(sourcePath) +\
+                      '" "' + make_path(targetPath) + '"'
+            os.system(finder_copy_string)
         return True
     elif OS == 'posix':
         copy_string = 'cp -Rf "' + sourcePath + '" "' + targetPath + '"'
-        os.system(copy_string)
+        subprocess.call(copy_string, shell=True)
         return True
     return False
 
@@ -1004,7 +1033,7 @@ def close_clipboard():
     except Exception, e:
         print e
 
-def get_mount_point(path):
+def get_mount_point(path, volume=True):
     path = os.path.abspath(path)
     while not os.path.ismount(path):
         path = os.path.dirname(path)
@@ -1021,7 +1050,10 @@ def get_mount_point(path):
     re1='.*?'	# Non-greedy match on filler
     re2='(?:[a-z][a-z]+)'	# Uninteresting: word
     re3='.*?'	# Non-greedy match on filler
-    re4='((?:[a-z][a-z]+))'	# Word 1
+    if not volume:
+        re4='((?:[a-z][a-z]+))'	# Word 1
+    else:
+        re4='((?:[a-z][a-z]*[0-9]+[a-z0-9]*))'	# Word 1
     rg = re.compile(re1+re2+re3+re4,re.IGNORECASE|re.DOTALL)
     m = rg.search(txt)
     if m:
@@ -1081,7 +1113,11 @@ def wait_for_dir_idle(dirs, verbose=False, idle_time=10):
     disks = []
     if os.name == 'posix':
         for dir in dirs:
-            device = get_mount_point(dir)
+            if OS == 'mac':
+                volume = True
+            else:
+                volume = False
+            device = get_mount_point(dir, volume=volume)
             disks.append(device)
     elif os.name == 'nt':
         for dir in dirs:

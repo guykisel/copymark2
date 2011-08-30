@@ -1,5 +1,5 @@
 # !/usr/bin/env python
-# Copymark2 v0.0.7: A simulation of real world file transfer performance
+# Copymark2 v0.0.8: A simulation of real world file transfer performance
 # Copyright (C) 2011  Guy Kisel
 # Project hosted at http://code.google.com/p/copymark2/
 
@@ -38,7 +38,7 @@ WRITE = 'S->T'
 #target to source
 READ = 'S<-T'
 
-TEST_NAME = 'Copymark2 0.0.7'
+TEST_NAME = 'Copymark2 0.0.8'
 CPU = platform.processor().replace(',', '')
 
 #build system info string for logging purposes
@@ -168,15 +168,13 @@ def test(file_size, file_count, source, target, fill_index=-1, fill=False, direc
     else:
         file_path = os.path.join(target, TEST_FILE_PATH, fill_string)
         deletion_path = os.path.join(source, TEST_FILE_PATH)
-    if reuse:
-        osutil.delete_dir(deletion_path)
+    osutil.delete_dir(deletion_path)
+    if not osutil.OS == 'mac':
         osutil.make_dir(deletion_path)
-    else:
+    if not reuse:
         #delete from both target and source
         osutil.delete_dir(file_path)
         osutil.make_dir(file_path)
-        osutil.delete_dir(deletion_path)
-        osutil.make_dir(deletion_path)
         print 'Generating files in: ' + file_path
         osutil.generate_files(file_path, file_size, file_count)
 
@@ -188,6 +186,11 @@ def test(file_size, file_count, source, target, fill_index=-1, fill=False, direc
 
     source_path = os.path.join(source, TEST_FILE_PATH)
     target_path = os.path.join(target, TEST_FILE_PATH, fill_string)
+    if osutil.OS == 'mac':
+        if direction == WRITE:
+            target_path = target
+        else:
+            source_path = source
 
     #wait for disks to settle
     osutil.wait_for_dir_idle([target, source])
@@ -261,7 +264,7 @@ def run_workload(workload, calibration_script, source, target, _calibrate, sweep
         #writes always happen after reads, so reuse if write
         #if not the first trial and not sweeping, the previous trial had the same workload, so reuse
         #if calibrate mode is on and files were just generated, reuse
-        if not osutil.OS == 'mac' and (direction == WRITE or (trial > 0 and not sweep) or (_calibrate and files_generated)):
+        if (direction == WRITE or (trial > 0 and not sweep) or (_calibrate and files_generated)):
             reuse = True
         else:
             reuse = False
