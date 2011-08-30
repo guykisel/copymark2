@@ -5,6 +5,8 @@ on run argv
 		with timeout of 999999999 seconds
 			try
 				duplicate dir1 to dir2
+            on error errmsg number errnum
+                display dialog errmsg & errnum
 			end try
 		end timeout
 	end tell
