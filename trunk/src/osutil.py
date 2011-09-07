@@ -129,15 +129,22 @@ def remount(dir, verbose=False, confirm_unmount=False):
             if m:
                 volume = m.group(3)
         attempts = 0
+        unmounted = False
         while True:
             if os.path.isdir(drive_letter + ':/'):
                 attempts += 1
                 output = diskpart(['select volume ' + drive_letter, 'remove'])
+                if attempts > 25:
+                    print 'Failed to unmount drive after 25 attempts'
+                    break
             else:
+                unmounted = True
                 break
             if not confirm_unmount:
+                unmounted = True
                 break
-        print str(attempts) + ' attempts required to unmount drive.'
+        if unmounted:
+            print str(attempts) + ' attempts required to unmount drive.'
         if attempts > 1:
             file = open('remounts.txt', 'w+')
             file.write(str(time.asctime()) + ' - ' + str(attempts) + ' remount attempts.')
