@@ -6,11 +6,14 @@ Copymark is a hard drive (and any other storage solution that can be mounted as 
   * You can find Copymark1 releases at [http://sourceforge.net/projects/copytest/ Sourceforge].
   * Copymark1 is a GUI tool.
   * Copymark1 supports Windows and OS X.
+  * Copymark1 is no longer being developed or supported. It has flaws that can lead to inaccurate data.
+
 
 = Copymark2 =
   * Copymark2 is a from-scratch rewrite of Copymark1 that is designed to be easier to use, more reliable, and more flexible.
   * Copymark2 uses a command line interface. (A GUI is planned)
   * Copymark2 supports Windows, OS X, and Linux.
+  * Copymark2 has improvements over Copymark1, such as monitoring disk activity to ensure that a file transfer is complete before beginning a new file transfer.
 
 = Using Copymark2 =
  * [Setup]
