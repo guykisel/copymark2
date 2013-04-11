@@ -23,7 +23,7 @@ elif os.name == 'posix':
 else:
     OS = 'other'
 
-#used by filesystemLock class
+# used by filesystemLock class
 filesystem_lock = threading.RLock()
 
 if OS == 'windows':
@@ -80,8 +80,8 @@ def windows_version():
 
         key = _winreg.OpenKey(_winreg.HKEY_LOCAL_MACHINE,
                               'SOFTWARE/Microsoft\Windows NT/CurrentVersion')
-        os_version = str(str(_winreg.QueryValueEx(key, 'ProductName')[0]) +\
-                         ' ' + str(platform.win32_ver()[2]) + ' ' +\
+        os_version = str(str(_winreg.QueryValueEx(key, 'ProductName')[0]) + \
+                         ' ' + str(platform.win32_ver()[2]) + ' ' + \
                          str(platform.version())).replace(',', '')
         return os_version
     else:
@@ -111,19 +111,19 @@ def remount(dir, verbose=False, confirm_unmount=False):
                                                                          '')
         volume = None
         output = diskpart(['select volume ' + drive_letter])
-        re1='(Volume)'	# Word 1
-        re2='( )'	# White Space 1
-        re3='(\\d+)'	# Integer Number 1
-        re4='( )'	# White Space 2
-        re5='(is)'	# Word 2
-        re6='( )'	# White Space 3
-        re7='(the)'	# Word 3
-        re8='( )'	# White Space 4
-        re9='(selected)'	# Word 4
-        re10='( )'	# White Space 5
-        re11='(volume)'	# Word 5
-        re12='(\\.)'	# Any Single Character
-        rg = re.compile(re1+re2+re3+re4+re5+re6+re7+re8+re9+re10+re11+re12,re.IGNORECASE|re.DOTALL)
+        re1 = '(Volume)'  # Word 1
+        re2 = '( )'  # White Space 1
+        re3 = '(\\d+)'  # Integer Number 1
+        re4 = '( )'  # White Space 2
+        re5 = '(is)'  # Word 2
+        re6 = '( )'  # White Space 3
+        re7 = '(the)'  # Word 3
+        re8 = '( )'  # White Space 4
+        re9 = '(selected)'  # Word 4
+        re10 = '( )'  # White Space 5
+        re11 = '(volume)'  # Word 5
+        re12 = '(\\.)'  # Any Single Character
+        rg = re.compile(re1 + re2 + re3 + re4 + re5 + re6 + re7 + re8 + re9 + re10 + re11 + re12, re.IGNORECASE | re.DOTALL)
         for line in output:
             m = rg.search(line)
             if m:
@@ -152,8 +152,9 @@ def remount(dir, verbose=False, confirm_unmount=False):
         if verbose:
             for line in output:
                 if 'successfully assigned' in line:
-                    return
+                    return True
             print 'Unable to remount.'
+            return False
     elif os.name == 'posix':
         path = os.path.abspath(dir)
         while not os.path.ismount(path):
@@ -165,25 +166,27 @@ def remount(dir, verbose=False, confirm_unmount=False):
                 unmount_string = 'umount "' + path + '"'
             elif OS == 'mac':
                 unmount_string = 'diskutil unmount "' + path + '"'
-            #print unmount_string
+            # print unmount_string
             subprocess.call(unmount_string, shell=True)
             time.sleep(3)
             if not OS == 'mac':
                 mkdir_string = 'mkdir "' + path + '"'
-                #print mkdir_string
+                # print mkdir_string
                 subprocess.call(mkdir_string, shell=True)
                 time.sleep(1)
             if OS == 'posix':
                 mount_string = 'mount /dev/' + device + ' "' + path + '"'
             elif OS == 'mac':
                 mount_string = 'diskutil mount /dev/' + device
-            #print mount_string
+            # print mount_string
             subprocess.call(mount_string, shell=True)
             time.sleep(3)
             print 'Remount complete.'
+            return True
         except OSError, e:
             print e
             print 'Remount of ' + dir + ' failed.'
+            return False
 
 def get_drive_letter(dir):
     """Get the drive letter of a given directory. For example, given 
@@ -214,7 +217,7 @@ def get_disk_space(path):
         tuple = win32api.GetDiskFreeSpace(make_path(path))
         return tuple[0] * tuple[1] * tuple[2]
     elif os.name == 'posix':
-        os.system('df ' + make_path(path) + ' > ' + make_path(path,\
+        os.system('df ' + make_path(path) + ' > ' + make_path(path, \
                                                               'dirsize.txt'))
         dir = open(make_path(path, 'dirsize.txt'), 'r')
         dir.readline()
@@ -242,7 +245,7 @@ def disable_autorun():
 
         key = _winreg.OpenKey(_winreg.HKEY_LOCAL_MACHINE,
                               'Software/Microsoft/Windows/CurrentVersion/Policies/Explorer')
-        #return _winreg.QueryValueEx(key, 'ProductName')[0]:
+        # return _winreg.QueryValueEx(key, 'ProductName')[0]:
         _winreg.SetValueEx(key, 'NoDriveTypeAutoRun', 0, _winreg.REG_DWORD, 0xFF)
 
 def get_time():
@@ -290,17 +293,17 @@ def scale_bytes(size):
 def filegen(path, size, verbose=False):
     """Generate a file made up of random data."""
     if os.name == 'nt':
-    #use the random data file creator tool
+    # use the random data file creator tool
         if verbose:
             print 'Generating file: ' + str(size) + ' bytes'
         subprocess.call('rdfc "' + path + '" ' + str(size) + ' > nul', shell=True)
     elif os.name == 'posix':
         if size >= 1048576:
-        #generate 1 MiB of random bytes
+        # generate 1 MiB of random bytes
             subprocess.call('dd if=/dev/urandom of=temp.txt bs=1 count=1048576', shell=True)
         while size >= 1048576:
-        #repeatedly concatenate the above generated data to generate a
-        #larger file
+        # repeatedly concatenate the above generated data to generate a
+        # larger file
             subprocess.call('cat temp.txt >> "' + path + '"', shell=True)
             size -= 1048576
         if size > 0:
@@ -322,7 +325,7 @@ def generate_files(file_path, file_size, file_count):
         except IOError, e:
             print 'Generate failed!'
             print str(e)
-    print 'Time to generate files: ' + str(int(time.clock() - start))+ ' seconds'
+    print 'Time to generate files: ' + str(int(time.clock() - start)) + ' seconds'
     return generated_files
 
 def make_path(*args):
@@ -370,14 +373,14 @@ def make_dir(path):
 
 @filesystemLock
 def make_all_dirs_in_path(path):
-    #if the path doesn't already exist
+    # if the path doesn't already exist
     if not os.path.exists(path):
-        #split it into the last part of the path and everything else
+        # split it into the last part of the path and everything else
         (head, tail) = os.path.split(path)
-        #if everything else doesn't exist, create it
+        # if everything else doesn't exist, create it
         if not os.path.exists(head):
             make_all_dirs_in_path(head)
-        #create the last part of the path
+        # create the last part of the path
         make_dir(path)
 
 def copy_files(sourcePath, targetPath):
@@ -403,39 +406,39 @@ def copy(sourcePath, targetPath, is_dir=True, verbose=False, quiet=True, shell_c
         make_dir(targetPath)
     if os.name == 'nt':
         if shell_copy:
-            #set flags for SHFileOperation
-            flags = shellcon.FOF_NOCONFIRMATION |   \
+            # set flags for SHFileOperation
+            flags = shellcon.FOF_NOCONFIRMATION | \
             shellcon.FOF_NOERRORUI | shellcon.FOF_NOCONFIRMMKDIR
             if quiet:
-                #don't pop up the transfer progress window
+                # don't pop up the transfer progress window
                 flags = flags | shellcon.FOF_SILENT
             shfileopstruct = (0, shellcon.FO_COPY, sourcePath, targetPath,
-                              flags,\
+                              flags, \
                               None, None)
-            #start the file transfer
+            # start the file transfer
             r_int, r_boolean = shell.SHFileOperation(shfileopstruct)
             if r_int == 0 and not shfileopstruct[5]:
-                #successful transfer
+                # successful transfer
                 return True
             else:
-                #failed transfer
+                # failed transfer
                 return False
         else:
             try:
                 FILES_COPIED = 0
                 if not os.path.isdir(sourcePath):
-                    #if it's just a single file, transfer it
+                    # if it's just a single file, transfer it
                     win32file.CopyFileEx(sourcePath, targetPath)
                 else:
-                    #otherwise, walk the directory tree and add all the files in it
-                    #to a list of files to copy.
+                    # otherwise, walk the directory tree and add all the files in it
+                    # to a list of files to copy.
                     files_to_copy = []
                     for root, dirs, files in os.walk(sourcePath):
                         root = os.path.normpath(root)
                         sub_root = root.split(sourcePath)[-1]
                         for name in files:
                             files_to_copy.append((os.path.join(root, name), os.path.join(targetPath, sub_root, name)))
-                    #for each file in the list, copy the file.
+                    # for each file in the list, copy the file.
                     for source, dest in files_to_copy:
                         win32file.CopyFileEx(source, dest, ProgressRoutine=copyprogress)
                     start = time.clock()
@@ -450,7 +453,7 @@ def copy(sourcePath, targetPath, is_dir=True, verbose=False, quiet=True, shell_c
         if not os.path.isdir(sourcePath):
             os.system('cp -Rf "' + sourcePath + '" "' + targetPath + '"')
         else:
-            finder_copy_string = 'osascript finder_copy.scpt "' + make_path(sourcePath) +\
+            finder_copy_string = 'osascript finder_copy.scpt "' + make_path(sourcePath) + \
                       '" "' + make_path(targetPath) + '"'
             os.system(finder_copy_string)
         return True
@@ -602,15 +605,15 @@ def volume_match(line):
     '  Volume 4     F   New Volume   NTFS   Partition    466 GB  Healthy'
 
     """
-    #txt='  Volume 4     F   New Volume   NTFS   Partition    466 GB  Healthy'
+    # txt='  Volume 4     F   New Volume   NTFS   Partition    466 GB  Healthy'
 
-    re1 = '(/s+)'    # White Space 1
-    re2 = '(Volume)'    # Word 1
-    re3 = '(/s+)'    # White Space 2
-    re4 = '(/d+)'    # Integer Number 1
-    re5 = '(/s+)'    # White Space 3
-    re6 = '(.)'    # Any Single Character 1
-    re7 = '(/s+)'    # White Space 4
+    re1 = '(/s+)'  # White Space 1
+    re2 = '(Volume)'  # Word 1
+    re3 = '(/s+)'  # White Space 2
+    re4 = '(/d+)'  # Integer Number 1
+    re5 = '(/s+)'  # White Space 3
+    re6 = '(.)'  # Any Single Character 1
+    re7 = '(/s+)'  # White Space 4
 
     rg = re.compile(re1 + re2 + re3 + re4 + re5 + re6 + re7,
                     re.IGNORECASE | re.DOTALL)
@@ -651,15 +654,15 @@ def disk_number_and_size(line):
     """
     txt = '   Disk 0    Online        74 GB      0 B'
 
-    re1 = '(/s+)'    # White Space 1
-    re2 = '(Disk)'    # Word 1
-    re3 = '(/s+)'    # White Space 2
-    re4 = '(/d+)'    # Integer Number 1
-    re5 = '(/s+)'    # White Space 3
-    re6 = '(Online)'    # Word 2
-    re7 = '(/s+)'    # White Space 4
-    re8 = '(/d+)'    # Integer Number 2
-    re9 = '(/s+)'    # White Space 5
+    re1 = '(/s+)'  # White Space 1
+    re2 = '(Disk)'  # Word 1
+    re3 = '(/s+)'  # White Space 2
+    re4 = '(/d+)'  # Integer Number 1
+    re5 = '(/s+)'  # White Space 3
+    re6 = '(Online)'  # Word 2
+    re7 = '(/s+)'  # White Space 4
+    re8 = '(/d+)'  # Integer Number 2
+    re9 = '(/s+)'  # White Space 5
 
     rg = re.compile(re1 + re2 + re3 + re4 + re5 + re6 + re7 + re8 + re9,
                     re.IGNORECASE | re.DOTALL)
@@ -773,13 +776,13 @@ def find_open_letter(used_letters=[]):
 @filesystemLock
 def volume_letters():
     """Return all currently used drive letters."""
-    re1 = '(/s+)'    # White Space 1
-    re2 = '(Volume)'    # Word 1
-    re3 = '(/s+)'    # White Space 2
-    re4 = '(/d+)'    # Integer Number 1
-    re5 = '(/s+)'    # White Space 3
-    re6 = '(.)'    # Any Single Character 1
-    re7 = '(/s+)'    # White Space 4
+    re1 = '(/s+)'  # White Space 1
+    re2 = '(Volume)'  # Word 1
+    re3 = '(/s+)'  # White Space 2
+    re4 = '(/d+)'  # Integer Number 1
+    re5 = '(/s+)'  # White Space 3
+    re6 = '(.)'  # Any Single Character 1
+    re7 = '(/s+)'  # White Space 4
 
     rg = re.compile(re1 + re2 + re3 + re4 + re5 + re6 + re7,
                     re.IGNORECASE | re.DOTALL)
@@ -862,8 +865,8 @@ def split_disk(disk_number, partitions=4, letters=None, fs='NTFS', table=None):
 
     clean_disk(disk_number)
 
-    #workaround for diskpart crash in vista and 7:
-    #if "detail disk" is run on an unformatted disk, diskpart crashes
+    # workaround for diskpart crash in vista and 7:
+    # if "detail disk" is run on an unformatted disk, diskpart crashes
     convert_mbr(disk_number)
     create_formatted_partition(disk_number, 8, letter=find_open_letter())
 
@@ -871,8 +874,8 @@ def split_disk(disk_number, partitions=4, letters=None, fs='NTFS', table=None):
     time.sleep(10)
     details = disk_details(find_disk_number(disk_number))
 
-    #workaround for diskpart crash in vista and 7:
-    #if "detail disk" is run on an unformatted disk, diskpart crashes
+    # workaround for diskpart crash in vista and 7:
+    # if "detail disk" is run on an unformatted disk, diskpart crashes
     clean_disk(disk_number)
 
     if table == 'MBR':
@@ -911,7 +914,7 @@ def diskpart(commands=None, verbose=False):
         if commands != None:
             script = 'temp.txt'
             temp = open(script, 'w')
-            #check to see if it's a string
+            # check to see if it's a string
             if type(commands) == type('blah'):
                 if verbose:
                     print 'Diskpart will run: ' + str(commands)
@@ -977,7 +980,7 @@ def get_percent_processor_time(cpu):
     return int(info.PercentProcessorTime)
 
 def get_process_percent_processor_time(procName, partial_match=False):
-    #WMI query doesn't work if process name ends with .exe
+    # WMI query doesn't work if process name ends with .exe
     procName = procName.rstrip('.exe')
     list = []
 
@@ -1053,18 +1056,18 @@ def get_mount_point(path, volume=True):
             device = line
 
     import re
-    txt=device
-    re1='.*?'	# Non-greedy match on filler
-    re2='(?:[a-z][a-z]+)'	# Uninteresting: word
-    re3='.*?'	# Non-greedy match on filler
+    txt = device
+    re1 = '.*?'  # Non-greedy match on filler
+    re2 = '(?:[a-z][a-z]+)'  # Uninteresting: word
+    re3 = '.*?'  # Non-greedy match on filler
     if not volume:
-        re4='((?:[a-z][a-z]+))'	# Word 1
+        re4 = '((?:[a-z][a-z]+))'  # Word 1
     else:
-        re4='((?:[a-z][a-z]*[0-9]+[a-z0-9]*))'	# Word 1
-    rg = re.compile(re1+re2+re3+re4,re.IGNORECASE|re.DOTALL)
+        re4 = '((?:[a-z][a-z]*[0-9]+[a-z0-9]*))'  # Word 1
+    rg = re.compile(re1 + re2 + re3 + re4, re.IGNORECASE | re.DOTALL)
     m = rg.search(txt)
     if m:
-        device=m.group(1)
+        device = m.group(1)
     return device
 
 def disk_activity(disk):
@@ -1078,30 +1081,30 @@ def disk_activity(disk):
                              stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                              shell=True)
         import re
-        re1='.*?'	# Non-greedy match on filler
-        re2='\\d+'	# Uninteresting: int
-        re3='.*?'	# Non-greedy match on filler
-        re4='\\d+'	# Uninteresting: int
-        re5='.*?'	# Non-greedy match on filler
-        re6='\\d+'	# Uninteresting: int
-        re7='.*?'	# Non-greedy match on filler
-        re8='\\d+'	# Uninteresting: int
-        re9='.*?'	# Non-greedy match on filler
-        re10='\\d+'	# Uninteresting: int
-        re11='.*?'	# Non-greedy match on filler
-        re12='\\d+'	# Uninteresting: int
-        re13='.*?'	# Non-greedy match on filler
-        re14='\\d+'	# Uninteresting: int
-        re15='.*?'	# Non-greedy match on filler
-        re16='\\d+'	# Uninteresting: int
-        re17='.*?'	# Non-greedy match on filler
-        re18='(\\d+)'	# Integer Number 1
+        re1 = '.*?'  # Non-greedy match on filler
+        re2 = '\\d+'  # Uninteresting: int
+        re3 = '.*?'  # Non-greedy match on filler
+        re4 = '\\d+'  # Uninteresting: int
+        re5 = '.*?'  # Non-greedy match on filler
+        re6 = '\\d+'  # Uninteresting: int
+        re7 = '.*?'  # Non-greedy match on filler
+        re8 = '\\d+'  # Uninteresting: int
+        re9 = '.*?'  # Non-greedy match on filler
+        re10 = '\\d+'  # Uninteresting: int
+        re11 = '.*?'  # Non-greedy match on filler
+        re12 = '\\d+'  # Uninteresting: int
+        re13 = '.*?'  # Non-greedy match on filler
+        re14 = '\\d+'  # Uninteresting: int
+        re15 = '.*?'  # Non-greedy match on filler
+        re16 = '\\d+'  # Uninteresting: int
+        re17 = '.*?'  # Non-greedy match on filler
+        re18 = '(\\d+)'  # Integer Number 1
         
-        rg = re.compile(re1+re2+re3+re4+re5+re6+re7+re8+re9+re10+re11+re12+re13+re14+re15+re16+re17+re18,re.IGNORECASE|re.DOTALL)
+        rg = re.compile(re1 + re2 + re3 + re4 + re5 + re6 + re7 + re8 + re9 + re10 + re11 + re12 + re13 + re14 + re15 + re16 + re17 + re18, re.IGNORECASE | re.DOTALL)
         for line in p.stdout.readlines():
             m = rg.search(line)
             if m:
-                int1=m.group(1)
+                int1 = m.group(1)
                 return int1
 
     elif OS == 'mac':

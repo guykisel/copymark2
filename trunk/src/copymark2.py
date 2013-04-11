@@ -1,6 +1,6 @@
 # !/usr/bin/env python
-# Copymark2 v0.0.9: A simulation of real world file transfer performance
-# Copyright (C) 2011  Guy Kisel
+# Copymark2 v0.0.11: A simulation of real world file transfer performance
+# Copyright (C) 2013  Guy Kisel
 # Project hosted at http://code.google.com/p/copymark2/
 
 # This program is free software; you can redistribute it and/or modify
@@ -16,8 +16,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-__author__="kisel_g"
-__date__ ="$May 25, 2010 3:30:10 PM$"
+__author__ = "kisel_g"
+__date__ = "$May 25, 2010 3:30:10 PM$"
 
 import osutil
 import os
@@ -26,22 +26,22 @@ import datetime
 import time
 import sys
 
-#store tuple pairs of file sizes and counts
+# store tuple pairs of file sizes and counts
 calibrated_counts = {}
 
-#the path on each drive where test files are created
+# the path on each drive where test files are created
 TEST_FILE_PATH = osutil.make_path('copymark_temp_files/')
 
-#source to target
+# source to target
 WRITE = 'S->T'
 
-#target to source
+# target to source
 READ = 'S<-T'
 
-TEST_NAME = 'Copymark2 0.0.9'
+TEST_NAME = 'Copymark2 0.0.11'
 CPU = platform.processor().replace(',', '')
 
-#build system info string for logging purposes
+# build system info string for logging purposes
 sysinfo = str(platform.architecture()) + '\n' + str(platform.uname())
 sysinfo_raw = []
 sysinfo_raw.extend(platform.architecture())
@@ -50,7 +50,7 @@ if os.name == 'nt':
     sysinfo += '\n' + str(platform.win32_ver())
     sysinfo_raw.extend(platform.win32_ver())
     try:
-        #look up the windows version in the registry
+        # look up the windows version in the registry
         import _winreg
         key = _winreg.OpenKey(_winreg.HKEY_LOCAL_MACHINE,
         'SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion')
@@ -60,7 +60,7 @@ if os.name == 'nt':
         print e
         OS_VERSION = 'unknown'
 elif osutil.OS == 'mac':
-    #if not windows, assume it's running on a mac
+    # if not windows, assume it's running on a mac
     startTime = time.time()
     sysinfo += '\n'
     OS_VERSION = ''
@@ -82,6 +82,8 @@ elif osutil.OS == 'posix':
 
 print 'OS: ' + str(OS_VERSION)
 
+failed_remount_drives = []
+
 def calibrate(file_size, source, target, start_count=None, calibration_script=None):
     """Calibrate a file count for a given file size."""
     global calibrated_counts
@@ -89,7 +91,7 @@ def calibrate(file_size, source, target, start_count=None, calibration_script=No
     if not start_count:
         start_count = 1
 
-    #if the size has already been calibrated
+    # if the size has already been calibrated
     if file_size in calibrated_counts:
         return calibrated_counts[file_size], False
 
@@ -154,14 +156,14 @@ def default_calibration(file_size, start_count, source, target):
     osutil.delete_dir(os.path.join(target, TEST_FILE_PATH))
     return calibrated_count
 
-def test(file_size, file_count, source, target, fill_index=-1, fill=False, direction=None, reuse=False, verbose=False, shell_copy=True):
+def test(file_size, file_count, source, target, fill_index= -1, fill=False, direction=None, reuse=False, verbose=False, shell_copy=True, test_file_directory=None):
     """Run an individual size/count pair."""
 
     if fill:
-        fill_string = os.path.join(str(fill_index),str(file_size) + '_' + str(file_count))
+        fill_string = os.path.join(str(fill_index), str(file_size) + '_' + str(file_count))
     else:
         fill_string = ''
-    #file generation/reuse logic
+    # file generation/reuse logic
     if direction == WRITE:
         file_path = os.path.join(source, TEST_FILE_PATH)
         deletion_path = os.path.join(target, TEST_FILE_PATH, fill_string)
@@ -172,15 +174,26 @@ def test(file_size, file_count, source, target, fill_index=-1, fill=False, direc
     if not osutil.OS == 'mac':
         osutil.make_dir(deletion_path)
     if not reuse:
-        #delete from both target and source
+        # delete from both target and source
         osutil.delete_dir(file_path)
         osutil.make_dir(file_path)
-        print 'Generating files in: ' + file_path
-        osutil.generate_files(file_path, file_size, file_count)
+        if not test_file_directory:
+            print 'Generating files in: ' + file_path
+            osutil.generate_files(file_path, file_size, file_count)
+        else:
+            print 'Copying test files from ' + test_file_directory + ' to ' + file_path
+            osutil.copy_dir(test_file_directory, file_path)
 
-    #remount drives to clear the file cache
-    osutil.remount(file_path, verbose=True, confirm_unmount=True)
-    osutil.remount(deletion_path, verbose=True, confirm_unmount=True)
+    # remount drives to clear the file cache
+    print 'Drives that have failed to remount: {0}'.format(failed_remount_drives)
+    if not os.path.splitdrive(file_path)[0] in failed_remount_drives:
+        remount = osutil.remount(file_path, verbose=True, confirm_unmount=True)
+        if not remount:
+            failed_remount_drives.append(os.path.splitdrive(file_path)[0])
+    if not os.path.splitdrive(deletion_path)[0] in failed_remount_drives:
+        remount = osutil.remount(deletion_path, verbose=True, confirm_unmount=True)
+        if not remount:
+            failed_remount_drives.append(os.path.splitdrive(deletion_path)[0])
     osutil.clear_file_cache()
     time.sleep(1)
 
@@ -192,27 +205,27 @@ def test(file_size, file_count, source, target, fill_index=-1, fill=False, direc
         else:
             source_path = source
 
-    #wait for disks to settle
+    # wait for disks to settle
     osutil.wait_for_dir_idle([target, source])
 
     if verbose:
         print 'Copying... '
 
-    #test window
+    # test window
     start = osutil.get_time()
     if direction == WRITE:
         success = osutil.copy_dir(source_path, target_path, shell_copy=shell_copy, quiet=False)
     else:
         success = osutil.copy_dir(target_path, source_path, shell_copy=shell_copy, quiet=False)
     end = osutil.get_time()
-    #end of test window
+    # end of test window
 
     duration = end - start
 
     counter = 0
     while True:
         if not os.path.isdir(osutil.make_path(deletion_path) + '/'):
-            #raise exception because transfer failed
+            # raise exception because transfer failed
             print 'ERROR: Destination folder(' + str(deletion_path) + ') not found. Transfer failed.'
         elif not success:
             print 'ERROR: File copy function returned False. Transfer failed.'
@@ -224,11 +237,11 @@ def test(file_size, file_count, source, target, fill_index=-1, fill=False, direc
         time.sleep(5)
 
     print 'File transfer call returned. Waiting for disk activity to stop...'
-    #wait for disks to settle
+    # wait for disks to settle
     last_activity = osutil.wait_for_dir_idle([target, source])
     true_duration = last_activity - start
 
-    #print out some quick stats
+    # print out some quick stats
     if verbose:
         total_size = file_size * file_count
         (printSize, units) = osutil.scale_bytes(total_size)
@@ -251,8 +264,9 @@ def run_workload(workload, calibration_script, source, target, _calibrate, sweep
         direction = workitem.direction
         trial = workitem.trial
         fill_index = workitem.fill_index
+        test_file_directory = workitem.directory
 
-        if _calibrate:
+        if _calibrate and not test_file_directory:
             if not calibration_script:
                 calibration_method = '20 second minimum'
             else:
@@ -261,9 +275,9 @@ def run_workload(workload, calibration_script, source, target, _calibrate, sweep
         else:
             calibration_method = 'not calibrated'
 
-        #writes always happen after reads, so reuse if write
-        #if not the first trial and not sweeping, the previous trial had the same workload, so reuse
-        #if calibrate mode is on and files were just generated, reuse
+        # writes always happen after reads, so reuse if write
+        # if not the first trial and not sweeping, the previous trial had the same workload, so reuse
+        # if calibrate mode is on and files were just generated, reuse
         if (direction == WRITE or (trial > 0 and not sweep) or (_calibrate and files_generated)):
             reuse = True
         else:
@@ -271,13 +285,13 @@ def run_workload(workload, calibration_script, source, target, _calibrate, sweep
 
         print ''
         print '*' * 79
-        print 'Test run ' + str(i+1) + ' of ' + str(len(workload)) + ': Direction = ' + direction + ', Trial = ' + str(trial) + ', Reuse = ' + str(reuse)
+        print 'Test run ' + str(i + 1) + ' of ' + str(len(workload)) + ': Direction = ' + direction + ', Trial = ' + str(trial) + ', Reuse = ' + str(reuse)
         size, units = osutil.scale_bytes(file_size)
         total_size, total_units = osutil.scale_bytes(file_size * file_count)
         print 'File size: ' + str(size) + ' ' + str(units) + ' x ' + str(file_count) + ' files (' + str(total_size) + ' ' + str(total_units) + ' total)'
         print '*' * 79
-        duration, start, end, true_duration = test(file_size, file_count, source, target, fill_index, fill, direction, reuse, verbose=True)
-        time_elapsed = str(datetime.timedelta(seconds=int(osutil.get_time() - test_start_time))).replace(',',' ')
+        duration, start, end, true_duration = test(file_size, file_count, source, target, fill_index, fill, direction, reuse, verbose=True, test_file_directory=test_file_directory)
+        time_elapsed = str(datetime.timedelta(seconds=int(osutil.get_time() - test_start_time))).replace(',', ' ')
         print 'Time elapsed: ' + time_elapsed
         results.append(Result(source, target, file_size, file_count, direction, trial, fill_index, reuse, duration, start, end, time_elapsed, calibration_method, true_duration))
 
@@ -313,7 +327,7 @@ def log_results(results, logfile, calibrated_workload_filename):
 
     result_dict = {}
 
-    #column names
+    # column names
     log.write('reading from, writing to, I/O direction, MiB/s, MB/s, total bytes, file size, file count, duration, true_duration, true_MiB/s, start time, end time, trial, fill index, test, OS, CPU, start date, test duration, calibration method, notes\n')
     for result in results:
 
@@ -391,10 +405,10 @@ def relative_standard_deviation(data):
     for x in data:
         n += 1
         Sum = Sum + x
-        Sum_sqr = Sum_sqr + x*x
+        Sum_sqr = Sum_sqr + x * x
 
-    mean = Sum/n
-    variance = (Sum_sqr - Sum*mean)/(n - 1)
+    mean = Sum / n
+    variance = (Sum_sqr - Sum * mean) / (n - 1)
     standard_deviation = math.sqrt(variance)
     relative = (standard_deviation * 100) / mean
     return relative
@@ -412,53 +426,83 @@ def workload_size(workload_file, trials):
     total_size *= trials
     return total_size
 
+def compute_size(start_path):
+    total_size = 0
+    for dirpath, dirnames, filenames in os.walk(start_path):
+        for f in filenames:
+            fp = os.path.join(dirpath, f)
+            total_size += os.path.getsize(fp)
+    return total_size
+
+def compute_count(start_path):
+    total_count = 0
+    for dirpath, dirnames, filenames in os.walk(start_path):
+        for f in filenames:
+            total_count += 1
+    return total_count
+
 def parse_workload(workload_file, trials, sweep, fill, source, target):
     """Convert workload file to a list of tuples in the format
     (file_size, file_count, direction, trial)
     that run_workload() can read."""
     workload = []
     dummy_list = []
+    if os.path.isdir(workload_file):
+        size = compute_size(workload_file)
+        count = compute_count(workload_file)
     if fill:
-        fill_cycles = int(osutil.get_disk_space(target) / workload_size(workload_file, trials))
+        if os.path.isdir(workload_file):
+            fill_cycles = int(osutil.get_disk_space(target) / size)
+        else:
+            fill_cycles = int(osutil.get_disk_space(target) / workload_size(workload_file, trials))
     else:
         fill_cycles = 1
     for fill_index in xrange(fill_cycles):
-        for line in open(workload_file, 'r'):
-            line_list = line.split()
-            if len(line_list) != 3:
-                print 'Invalid workload entry: ' + str(line)
-                sys.exit()
-            count = int(line_list[0])
-            size = osutil.convertToBytes(float(line_list[1]), line_list[2])
-
-            if not sweep:
-                #writes
-                for i in xrange(0, trials):
-                    workload.append(WorkItem(size, count, READ, i, fill_index))
-                #reads
-                for i in xrange(0, trials):
-                    workload.append(WorkItem(size, count, WRITE, i, fill_index))
-            else:
-                dummy_list.append((size, count, None, None))
-
-        if sweep:
+        if os.path.isdir(workload_file):
+            # writes
             for i in xrange(0, trials):
-                list = []
-                for tuple in dummy_list:
-                    list.append(WorkItem(tuple[0], tuple[1], READ, i, fill_index))
-                    list.append(WorkItem(tuple[0], tuple[1], WRITE, i, fill_index))
-                workload.extend(list)
+                workload.append(WorkItem(size / count, count, READ, i, fill_index, workload_file))
+            # reads
+            for i in xrange(0, trials):
+                workload.append(WorkItem(size / count, count, WRITE, i, fill_index, workload_file))
+        else:
+            for line in open(workload_file, 'r'):
+                line_list = line.split()
+                if len(line_list) != 3:
+                    print 'Invalid workload entry: ' + str(line)
+                    sys.exit()
+                count = int(line_list[0])
+                size = osutil.convertToBytes(float(line_list[1]), line_list[2])
+    
+                if not sweep:
+                    # writes
+                    for i in xrange(0, trials):
+                        workload.append(WorkItem(size, count, READ, i, fill_index))
+                    # reads
+                    for i in xrange(0, trials):
+                        workload.append(WorkItem(size, count, WRITE, i, fill_index))
+                else:
+                    dummy_list.append((size, count, None, None))
+    
+            if sweep:
+                for i in xrange(0, trials):
+                    list = []
+                    for tuple in dummy_list:
+                        list.append(WorkItem(tuple[0], tuple[1], READ, i, fill_index))
+                        list.append(WorkItem(tuple[0], tuple[1], WRITE, i, fill_index))
+                    workload.extend(list)
 
     return workload
 
 class WorkItem(object):
-    def __init__(self, file_size, file_count, direction, trial, fill_index):
+    def __init__(self, file_size, file_count, direction, trial, fill_index, directory=None):
         self.file_size = file_size
         self.file_count = file_count
         self.direction = direction
         self.trial = trial
         self.fill_index = fill_index
-
+        self.directory = directory
+        
 def main(source, target, workload_file, calibrate, calibration_script, logfile, trials, sweep, fill):
     if not source.endswith('\\') or source.endswith('/'):
         source = os.path.normpath(source + '/').replace('\\ ', ' ')
@@ -497,7 +541,9 @@ if __name__ == "__main__":
         except ImportError:
             print 'Copymark requires the Python WMI module in Windows. http://timgolden.me.uk/python/wmi/index.html'
             sys.exit()
-    usage = 'usage: %prog [options] <source dir> <target dir> <workload file>'
+    usage = 'usage: %prog [options] <source dir> <target dir> <workload file>\n\n' + \
+        'If <workload file> is actually a directory, that directory will be used as the workload. ' + \
+        'The calibrate, heuristic, and sweep flags are ignored if a directory is used as a workload.' 
     parser = optparse.OptionParser(usage)
     parser.add_option('-c', '--calibrate', action='store_true', dest='calibrate', default=False, help='Automatically calibrate file counts. Defaults to False.')
     parser.add_option('-H', '--heuristic', action='store', type='string', dest='calibration_script', help='Specify an external calibration heuristic.')
